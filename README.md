@@ -5,6 +5,8 @@ Far East Development Revirew
 
 ## 2013summer
 
+テーマ：道具 技術者の道具
+
 1. 編集長からご挨拶
 1. エンジニアのイッピン
  - 仕事・生活に欠かせない道具
