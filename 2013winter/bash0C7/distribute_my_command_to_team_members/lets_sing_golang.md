@@ -7,6 +7,7 @@
 
 ## 目次
 
++ はじめる前に
 + 早速goをインストールして実行してみる
 + テストを書きながら敗北を知る
 + golangの書き方を覚える
@@ -15,14 +16,31 @@
 + 作ったコマンドをゴルーチンを使ってマルチスレッドっぽい動きに変える
 + golangの地平線を目指して
 
+## はじめる前に
+
+今回の方針としては、事前に使いこなし記事やリファレンスを精読せず、少しずつつまづきながら進めていこうと考えました。
+攻略方法を読んでゲームを進めるのはつまらないものです。このgolangの習得についてもたのしくゲームを進めるのとおなじように、こんな進め方をとったのは、エンタティメントとしてあえてつまづきながら少しずつ謎を解いていくように進めていきたいと考えたのです。
+
+なお、環境は下記を利用してます
+
+//TODO mac、goのバージョン、homebrew、IDE http://www.winsoft.sk/go.htm
+
 ## 早速goをインストールして実行してみる
 
-brew install go
-で終わり。
+では早速やってみましょう。homebrew経由でお手持ちのmacに簡単に入るいい時代になりました。
 
-なんか出た。
+````sh
+$ brew install go
 ````
+
+インストール完了。
+これでgoコマンドが入るので、ヘルプを見てみましょう。多分--helpで見れるような気がします。
+
+````sh
 $ go --help
+````
+
+````
 Go is a tool for managing Go source code.
 
 Usage:
@@ -57,13 +75,18 @@ Additional help topics:
     testfunc    description of testing functions
 
 Use "go help [topic]" for more information about that topic.
-
 ````
 
-http://golang.jp/install#osx
-のあと、インストールの確認
+どうやらgit、gem、bundlerなどのコマンドと同様にサブコマンドで拡張していくやり方のようですね。
+
+このgoコマンドでこれからやっていけるか、実際に確認してみましょう。
+ここは、http://golang.org/doc/install#testing を参考に、goの世界を動かしてみます。
+
 ````
 $ cat go_world.go 
+````
+
+````sh
 package main
 
 import "fmt"
@@ -71,39 +94,39 @@ import "fmt"
 func main() {
     fmt.Printf("Go World!\n")
 }
+````
+
+実行！
+
+````sh
 $  go run go_world.go 
+````
+
+````
 Go World!
 ````
 
-クロスコンパイル
+無事動いたので、一安心して次に進みましょう。
 
-http://unknownplace.org/archives/golang-cross-compiling.html
-
-$  GOOS=linux GOARCH=amd64 go build go_world.go
-$  ./go_world 
-zsh: exec format error: ./go_world
-$  GOOS=darwin GOARCH=amd64 go build go_world.go
-$  ./go_world 
-Go World!
-
-IDE http://www.winsoft.sk/go.htm
 
 ## テストを書きながら敗北を知る
 
-http://golang.jp/code#Testing
+なんでも、はじめからテスト用の仕組みがgoには備わっているらしいです。
 
-テスト対象ファイル名_test.goって名前をつける
+http://golang.org/doc/code.html#Testing にテストの書き方があるのでやってみます。
 
-go test   
+テスト対象ファイル名_test.goって名前をつけて、下記を実装したのち、go testとしてやればいいみたい。   
 
 - テスト対象と同じパッケージ
 - testingをimport
 -  TestXxx(t *testing.T)
 -  失敗の場合はt.Errorを呼び出す
 
-ただし、エラー用の出力があるだけなので、ifで調べなあかん。
+//TODO コード
+//TODO 結果
 
-やりにくいから、assertion作ろう。
+これは便利。テストコードの中でifで分岐しつつ、エラー側に倒れたら自分でt.Errorを呼び出さなくてはならないのはちょっとしんどいです。
+なので、やりやすくやりにくいから、assertion作ろう。
 
 testingをもとに、AssertEqualsを実装するぞ
 http://golang.jp/go_faq#testing_framework　によるといらんがなという話ではあるが、いちいちifは書きたくない。
@@ -119,6 +142,7 @@ func AseertEquals(expect, actual, t *testing.T) {
 え、引数の型必須？
 どうすんのこれ。stringかもしれず、intergerかもしれず。
 
+静的に型が決まるのがよく感覚が掴めない。でもprintfみたいになんでも取るのもある。
 
 型？
 戻り値？
@@ -134,9 +158,7 @@ func (c *common) Errorf(format string, args …interface{}) {
 }
 
 なにこれわからん。これをほっとくのは気持ちが悪い。
-
-
-
+これは挫折のピンチ。どこからどう調べて行ったらいいのか？
 
 ## golangの書き方を覚える
 
@@ -151,7 +173,7 @@ func (c *common) Errorf(format string, args …interface{}) {
 なにこれわからん。これをほっとくのは気持ちが悪い。
 ということで。
 
-関数名の後ろに引数と戻り値を書くのはわかった。では関数名の前にあるやつは？
+まず関数のシグネチャから関数名の後ろに引数と戻り値を書くのはわかった。では関数名の前にあるやつは？
 http://golang.jp/effective_go#methods
 
 これにはまず、メソッドと結びつけるために新たに名前付きの型を宣言し、メソッドにこの型のレシーバを定義します。
@@ -258,6 +280,10 @@ Date:   Tue Oct 29 20:54:05 2013 +0900
     assert.Equalsが通った！！！
 
 
+便利！
+練習問題を解いていくというのもあろうが、即物的なものを作っていきたい。
+さてじゃあここからハノイの塔とかフィボナッチ数とかやっていくよ〜というのが最近良く見るパターンではあるが、ワクワクしてこないのでやらない
+普段つかいのコマンドを作って、日々の生活をベースに習得していきたい。
 
 ## 普段から使っているWebサービスを叩く実用的なコマンドを作る
 
@@ -265,17 +291,37 @@ idobata
 
 idobataとは
 
+http://blog.idobata.io/post/57846296079
 
-# http
+````
+Idobata は弊社で長年使ってきた IRC を置き換えるべく社内にて開発を続けてきたプロダクトです。IRC の「場所に人が集まってくる感じ」を踏襲しつつ、イマドキっぽいテクノロジを取り入れてよりよいものにすることを目指しています。やりたいこと・やるべきことは山のようにあるのですが、現状のものをいったんベータとしてお披露目することにしました。
+
+Idobata はチーム開発にフォーカスしています。mention や GitHub 互換の emoji、各種サービスとの連携、通知用の Chrome Extension など、開発者が日々ストレスなく利用するための機能を備えています。
+````
+
+というツールであり、監視ツールやFluentdから投げるツールを書いてる。
+
+#idobata webhook
+
+webhook叩けば通知できる。
+http postするだけ。
+
+curl例
+
+#
+
+golangでpostするにはどうしたらいいだろう。Rubyならnet/httpとかHttperty
+きっとそういうパッケージがあるのではないか。
 
 http://golang.org/pkg/
 を見よう
 
 http://golang.org/pkg/net/http/
 うん、そのまんまやね
-
+あった。
 
 http://golang.org/pkg/net/http/#Client.Post
+あった。
 
 ### Webhook URL
 
@@ -351,6 +397,10 @@ URLはカンマ区切りで。
 
 同時並行数　concurrency　はフラグで。
 
+（スニペット）
+
+動いたー！
+コツとしては、無限ループの中でチャネル出し入れ。無限ループは関数の中に書いて、その関数をゴルーチンとして呼び出し。というのが鉄板な書き方なのかな。
 
 
 ## golangの地平線を目指して
@@ -362,3 +412,15 @@ URLはカンマ区切りで。
 プログラムの配布
 - http://qiita.com/futoase/items/73b7ca9fb16ca588ad6f
 - 複数ファイルにまたがった時のビルド
+
+クロスコンパイル
+
+http://unknownplace.org/archives/golang-cross-compiling.html
+
+$  GOOS=linux GOARCH=amd64 go build go_world.go
+$  ./go_world 
+zsh: exec format error: ./go_world
+$  GOOS=darwin GOARCH=amd64 go build go_world.go
+$  ./go_world 
+Go World!
+
