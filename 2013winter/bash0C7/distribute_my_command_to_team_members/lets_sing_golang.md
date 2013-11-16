@@ -389,9 +389,7 @@ FAIL	/path/to/go_world [build failed]
 今はintを指定すればいいのだろうけど、実際には文字列か整数かはたまた別物か、何がくるかわからないわけで、どうしたらいいのだろう。
 静的に型が決まる言語とは聞いていたけど、Errorfみたいに数字でも文字でもなんでも取るもののがあるわけで、どうにかできるはず。
 
-よし、コードを読もう。
-
-//TODO: URL
+よし、コードを読もう。http://golang.org/src/pkg/testing/testing.go だ。
 
 ````go
 // Errorf is equivalent to Logf followed by Fail.
@@ -404,7 +402,7 @@ func (c *common) Errorf(format string, args …interface{}) {
 ワカラヌ。
 
 これまでサクサク進んできたのに一気に難易度が上がってしまった感じ。
-これは挫折のピンチ。
+これは挫折のピンチ。焦る。辛い。
 
 ## golangの書き方を覚える
 
@@ -533,11 +531,9 @@ func Equals(expect interface{}, actual interface{}, t *testing.T) {
 	}
 }
 ````
-todo
 
-go build
-とか
-いろいろ
+//todo: go build
+//todo: go install
 
 これでassert.Equalsという名前でやれるようになった。
 できればt.AssertEqualsという呼び出し方にしたいところですが、どうにもやり方がわからなかったため、いずれリベンジしようと思います。
@@ -548,28 +544,38 @@ go build
 言語の勉強というと、ハノイの塔とかフィボナッチ数列とか数学の問題を解いていくよというパターンをよく見ますが、筆者にとってはまったくワクワクしてきません。普段つかいのコマンドを作って、日々の生活をよりよくしつつ、golangを習得したいです。
 
 そこで、普段お世話になっているidobataというWebサービスを叩くコマンドをgolangで作っいきます。
-idobata
 
-idobataとは
+### idobataとは
 
-http://blog.idobata.io/post/57846296079
+https://idobata.io/
 
-````
-Idobata は弊社で長年使ってきた IRC を置き換えるべく社内にて開発を続けてきたプロダクトです。IRC の「場所に人が集まってくる感じ」を踏襲しつつ、イマドキっぽいテクノロジを取り入れてよりよいものにすることを目指しています。やりたいこと・やるべきことは山のようにあるのですが、現状のものをいったんベータとしてお披露目することにしました。
+idobataは、Rubyやアジャイルで有名な老舗のシステム開発会社の株式会社永和システムマネジメントが提供しているグループチャットサービスです。
 
-Idobata はチーム開発にフォーカスしています。mention や GitHub 互換の emoji、各種サービスとの連携、通知用の Chrome Extension など、開発者が日々ストレスなく利用するための機能を備えています。
-````
+普段使いの道具として動作がとてもサクサクしており、様々な開発支援ツールとの連携とシンプルな操作が心地いい、最近お気に入りのサービスです。
+問い合わせの回答や機能改善のスピードが大変高速で、自分にとっては知っている人たちが作っているというのもあって、信頼感も高いです。
 
-というツールであり、監視ツールやFluentdから投げるツールを書いてる。
+### WebHook
 
-#idobata webhook
-
-webhook叩けば通知できる。
-http postするだけ。
+このidobataにはWebHookという機能があり、他のサービスから情報をidobataに流しこむことができます。
+Jenkins、Pivotal Trackerなどサービス別に用意されているのですが、汎用的な用途のためのGeneric Hookというものがあり、httpでPOSTするだけでidobataに文言を送ることができます。
 
 curl例
 
-#
+````
+curl --data-urlencode "source=<h1>hi</h1>" -d format=html https://idobata.io/hook/XXXXXXXXXXXXXXXXXXX
+````
+
+//TODO 画像
+
+普段このGeneric Hookを活用して、fluentd-plugin-idobataを使ってidobataにfluentを流れるデータを送りこんだり、システム監視ツールXymonから流し込んだりと大変便利に活用しています。
+
+それなので、golangでidobataのGeneric Hookにアクセスするコマンドを作ることで、golangの理解を深めるのと、普段の生活をよりよくするのと両方を実現しようと思います。
+
+では、さっそくコマンドの仕様を策定します。よくあるパターン通り、下記のようにしましょう。
+ - 入力: 環境変数でWeb HookのURLを受け取る。コマンドライン引数で流しこむ文言を受け取る。
+ - 出力: Web HookのURLに、流しこむ文言をhttp postする。
+
+### まず出力から
 
 golangでpostするにはどうしたらいいだろう。Rubyならnet/httpとかHttperty
 きっとそういうパッケージがあるのではないか。
@@ -601,6 +607,8 @@ import "net/url"らしい
 うごいたー！
 https://idobata.io/#/organization/koshiba/room/golang
 
+
+### まず出力から
 
 環境変数からの読み込みと引数からの読み込みをやろう
 http://golang.org/pkg/os/ らしい
