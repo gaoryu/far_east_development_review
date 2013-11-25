@@ -572,8 +572,12 @@ curl --data-urlencode "source=<h1>hi</h1>" -d format=html https://idobata.io/hoo
 それなので、golangでidobataのGeneric Hookにアクセスするコマンドを作ることで、golangの理解を深めるのと、普段の生活をよりよくするのと両方を実現しようと思います。
 
 では、さっそくコマンドの仕様を策定します。よくあるパターン通り、下記のようにしましょう。
- - 入力: 環境変数でWeb HookのURLを受け取る。コマンドライン引数で流しこむ文言を受け取る。
- - 出力: Web HookのURLに、流しこむ文言をhttp postする。
+ - 入力: 
+  - 環境変数でWeb HookのURLを受け取る
+  - 標準入力で文言を受け取る
+  - コマンドライン引数でオプショナルな要素を指定する
+ - 出力
+  - Web HookのURLに、流しこむ文言をhttp postする
 
 ### まず出力から
 
@@ -590,19 +594,26 @@ http://golang.org/pkg/net/http/
 http://golang.org/pkg/net/http/#Client.Post
 あった。
 
+import "net/url"らしい
+
+
 ### Webhook URL
 
 
 http.postform使って、固定で叩こう
-Overview通りやってみよう
 
-go build         
-# github.com/bash0C7/idobater
-./idobatar.go:8: undefined: url
+```go
+package main
 
+import "fmt"
+import "net/http"
+import "net/url"
 
-import "net/url"らしい
-
+func main() {
+        http.PostForm("https://idobata.io/hook/86983bb4-1d8c-4af8-b93b-b19631035b42",
+                        url.Values{"format": {"html"}, "source": {"<h1>hi</h1>"}})
+}
+```
 
 うごいたー！
 https://idobata.io/#/organization/koshiba/room/golang
@@ -611,16 +622,105 @@ https://idobata.io/#/organization/koshiba/room/golang
 ### まず出力から
 
 環境変数からの読み込みと引数からの読み込みをやろう
-http://golang.org/pkg/os/ らしい
+これらはhttp://golang.org/pkg/os/ にあるらしい。
+
+まずはos.Getenvで環境変数を読み込んでみましょう。
+
+```go
+package main
+
+import "net/http"
+import "net/url"
+import "os"
+
+func main() {
+        var webhook_url = os.Getenv("URL")
+        http.PostForm(webhook_url,
+                        url.Values{"format": {"html"}, "source": {"<h1>hi</h1>"}})
+}
+```
+
 
 引数はflagというのを使う。
+http.PostFormはエラー情報を返してくれるので、ソレを見てみましょう。
 
-そこからリファクタリングしたり、無名関数使ったり、読み込んだり
 
+```go
+package main
+
+import "net/http"
+import "net/url"
+import "os"
+
+import "fmt"
+import "flag"
+
+func main() {
+	Format := ""
+
+	flag.StringVar(&Format, "format", "html", "html or json")
+	flag.Parse()
+
+	var webhook_url = os.Getenv("URL")
+
+	fmt.Println(webhook_url)
+	fmt.Println(Format)
+
+	resp, err := http.PostForm(webhook_url, url.Values{"format": {Format}, "source": {"<h1>hoge</h1>"}})
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	fmt.Println(resp.Status)
+}
+````
+
+固定の文言をやめて、標準入力から読み込むことにしましょう、
+
+```go
+package main
+
+import "net/http"
+import "net/url"
+import "os"
+
+import "fmt"
+import "flag"
+import "io/ioutil"
+
+func main() {
+	Format := ""
+
+	bytes, err := ioutil.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	source := string(bytes)
+
+	flag.StringVar(&Format, "format", "html", "html or json")
+	flag.Parse()
+
+	var webhook_url = os.Getenv("URL")
+
+	fmt.Println(webhook_url)
+	fmt.Println(Format)
+
+	resp, err := http.PostForm(webhook_url, url.Values{"format": {Format}, "source": {source}})
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	fmt.Println(resp.Status)
+}
+
+```
+
+まずはこれで手元で動かす普段使いのコマンドとして必要な機能を満たしたものに仕立てることができました。
 
 ## 作ったコマンドをゴルーチンを使ってマルチスレッドっぽい動きに変える
 
-ゴルーチンだ
+とはいえ、このままではせっかくgolangをつかう甲斐ないので、golangらいしいものをしましょう。
+golangの大きな特徴として、ゴルーチンというマルチスレッドっぽい機能があります
+。
+初めての概念いきなりみましょう。
 
 http://qiita.com/cubicdaiya/items/ec8934faf4deb44fea2f
 
@@ -666,7 +766,88 @@ URLはカンマ区切りで。
 
 同時並行数　concurrency　はフラグで。
 
-（スニペット）
+```go
+package main
+
+import (
+	"net/http"
+	"net/url"
+	"os"
+
+	"flag"
+	"fmt"
+	"io/ioutil"
+	"strings"
+)
+
+func main() {
+	format, concurrency := func() (string, int) {
+		f := ""
+		flag.StringVar(&f, "format", "html", "html or json")
+
+		c := 0
+		flag.IntVar(&c, "concurrency", 0, "concurrency")
+
+		flag.Parse()
+
+		return f, c
+	}()
+
+	source := func() string {
+		bytes, err := ioutil.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		return string(bytes)
+	}()
+
+	webhook_url := make(chan string, concurrency)
+	post_done := make(chan int)
+
+	webhook_url_count := prepair_webhook_url(webhook_url, os.Getenv("URL"))
+	post_to_idobata(post_done, webhook_url, format, source)
+
+	exit_if(func() bool {
+		posted_count := 0
+		for {
+			posted_count = posted_count + <-post_done
+			if webhook_url_count <= posted_count {
+				break
+			}
+		}
+		return true
+	})
+}
+
+func prepair_webhook_url(webhook_url chan string, url string) int {
+	urls := strings.Split(url, ",")
+	go func() {
+		for _, u := range urls {
+			webhook_url <- u
+		}
+	}()
+	return len(urls)
+}
+
+func post_to_idobata(post_done chan int, webhook_url chan string, format string, source string) {
+	go func() {
+		for {
+			resp, err := http.PostForm(<-webhook_url, url.Values{"format": {format}, "source": {source}})
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			fmt.Println(resp.Status)
+			post_done <- 1
+		}
+	}()
+}
+
+func exit_if(condition func() bool) {
+	if condition() {
+		os.Exit(0)
+	}
+}
+```
 
 動いたー！
 コツとしては、無限ループの中でチャネル出し入れ。無限ループは関数の中に書いて、その関数をゴルーチンとして呼び出し。というのが鉄板な書き方なのかな。
